@@ -66,6 +66,19 @@ test('reset returns to the starting scene and can be undone', () => {
   assert.equal(editor.strokes.length, 2)
 })
 
+test('undo history keeps only the most recent 60 actions', () => {
+  const editor = new Editor()
+  const id = editor.addArrow(arrow)
+  for (let i = 1; i <= 61; i++) {
+    editor.beginAction()
+    editor.updateArrow(id, { x1: 0.8 + i / 1000 })
+  }
+
+  for (let i = 0; i < 60; i++) assert.ok(editor.undo())
+  assert.equal(editor.arrows[0].x1, 0.801)
+  assert.equal(editor.undo(), false)
+})
+
 test('sliders clamp to their range and ignore unknown names', () => {
   const editor = new Editor()
   editor.setParam('speed', 5)
