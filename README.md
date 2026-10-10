@@ -119,3 +119,5 @@ The sunset is "Yellow clouds at sunset" by PublicDomainPictures and the waterfal
 ## License
 
 MIT. See [LICENSE](LICENSE) and [CONTRIBUTING](CONTRIBUTING.md).
+
+Assisted by Claude/Codex.
