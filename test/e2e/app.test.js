@@ -409,7 +409,10 @@ describe('export', () => {
 })
 
 describe('browsers without WebGL 2', () => {
-  test('say so instead of showing a broken page', async () => {
+  test('replace the editor with an accessible explanation and a next step', async () => {
+    // Control: the unchanged browser still exposes a working editor.
+    assert.equal(await page.locator('#unsupported').isVisible(), false)
+    assert.equal(await page.getByRole('button', { name: 'Download GIF' }).count(), 1)
     const plain = await browser.newContext()
     const tab = await plain.newPage()
     await tab.addInitScript(() => {
@@ -418,12 +421,29 @@ describe('browsers without WebGL 2', () => {
         return type === 'webgl2' ? null : original.call(this, type, ...rest)
       }
     })
-    const failures = []
-    tab.on('pageerror', (e) => failures.push(e.message))
-    await tab.goto(`file://${new URL('../../dist/index.html', import.meta.url).pathname}`)
-    await tab.waitForSelector('#unsupported:not([hidden])')
-    assert.match(await tab.locator('#unsupported').textContent(), /WebGL 2/)
-    assert.deepEqual(failures, [])
-    await plain.close()
+    try {
+      const failures = []
+      tab.on('pageerror', (e) => failures.push(e.message))
+      await tab.goto(`file://${new URL('../../dist/index.html', import.meta.url).pathname}`)
+      await tab.waitForSelector('#unsupported:not([hidden])')
+      const message = await tab.locator('#unsupported').textContent()
+      assert.match(message, /This browser can't run WebGL 2/)
+      assert.match(message, /Try a current Chrome, Edge, Firefox or Safari/)
+      assert.match(message, /hardware acceleration is on/)
+      assert.deepEqual(failures, [])
+      assert.equal(await tab.getByRole('button', { name: 'Download GIF' }).count(), 0, 'unsupported browser still exposes Download GIF')
+      assert.equal(await tab.getByRole('button', { name: 'Open photo' }).count(), 0)
+      assert.equal(await tab.getByRole('slider').count(), 0)
+      assert.equal(await tab.getByRole('radio').count(), 0)
+      assert.equal(await tab.getByRole('link', { name: 'Skip to the photo' }).count(), 0)
+      assert.doesNotMatch(await tab.locator('body').innerText(), /Download GIF|Open photo|Drag on the photo/)
+      for (let n = 0; n < 8; n++) {
+        await tab.keyboard.press('Tab')
+        const focusedEditor = await tab.evaluate(() => !!document.activeElement.closest('#app, .bar-actions, .skip'))
+        assert.equal(focusedEditor, false, 'keyboard focus reached the unsupported editor')
+      }
+    } finally {
+      await plain.close()
+    }
   })
 })

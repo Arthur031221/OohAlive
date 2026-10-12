@@ -37,3 +37,9 @@ Node 22 or newer. The e2e tests run Chromium with software WebGL, so they pass o
 - Nothing may leave the page. The app makes no network requests and `verify` fails if it does.
 - Keep `src/core` free of the DOM where it can be.
 - Photos added to the repository must be CC0 or your own, with the source noted in `assets/photos/README.md`.
+
+## Boundary fixtures
+
+The e2e suite synthesizes fence rails crossing a moving region and hair beside a frozen face. It checks fully frozen pixels at the mask boundary across all 20 phases, with a no-arrow control and a moving-region control. These fixtures run with software WebGL and do not replace testing real photos or hardware.
+
+The GIF unit tests decode a one-pixel frozen border with colors near RGB565 palette bucket boundaries in every frame. Renderer period tests and shader/decoded-GIF closing-step tests are separate, so a repeated period cannot hide a large playback seam. `npm run verify` also measures the closing step in a GIF downloaded from the built page.

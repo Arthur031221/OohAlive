@@ -33,7 +33,9 @@ try {
   })
 } catch (error) {
   if (!(error instanceof WebGLUnavailable)) throw error
-  $('unsupported').hidden = false
+  const unsupported = $('unsupported')
+  unsupported.hidden = false
+  document.body.replaceChildren(unsupported)
 }
 
 if (stage) boot()

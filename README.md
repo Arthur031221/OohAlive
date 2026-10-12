@@ -109,7 +109,7 @@ npm run verify                    # downloads a GIF and checks the file
 - It works best on water, clouds, smoke, fabric and anything else that flows. It won't make a person walk, and a face under an arrow will wobble. Freeze it.
 - The GIF is at most 480 pixels on its long edge and one second long. Photos are reduced to 1600 pixels on the long edge for editing.
 - Arrows and brush strokes need a mouse, a finger or a pen. You can move and delete existing arrows from the keyboard.
-- Needs WebGL 2. Without it the page says so instead of showing a broken editor.
+- Needs WebGL 2. Without it the page replaces the editor and its controls with a message suggesting a current browser and checking hardware acceleration.
 - Tested in Chromium, including emulated touch. I haven't run it in Firefox or Safari, or on a real phone, so treat those as untested.
 
 ## Credits

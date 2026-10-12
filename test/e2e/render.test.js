@@ -2,6 +2,8 @@
 // noise texture where any shift, smear or leak is visible in the pixels.
 import { after, before, describe, test } from 'node:test'
 import assert from 'node:assert/strict'
+import { GifReader } from 'omggif'
+import { encodeGif, GIF } from '../../src/core/gif.js'
 import { diff, frame, launch, openApp, png, texture } from './helpers.js'
 
 const W = 240
@@ -121,13 +123,19 @@ describe('renderer invariants', () => {
     }
   })
 
-  test('the loop closes: the last frame leads into the first like any other pair', async () => {
+  test('the renderer repeats one full period without repeating at half a period', async () => {
+    await reset()
+    await addArrow({ x0: 0.1, y0: 0.4, x1: 0.8, y1: 0.55 })
+    const first = await frame(page, 0)
+    assert.equal(diff(await frame(page, 1), first).max, 0, 'phase 1 must equal phase 0')
+    assert.ok(diff(await frame(page, 0.5), first).pixels > 100, 'half a period must still differ')
+  })
+
+  test('the shader closing step is comparable to neighboring steps', async () => {
     await reset()
     await addArrow({ x0: 0.1, y0: 0.4, x1: 0.8, y1: 0.55 })
     const frames = []
     for (let k = 0; k < 40; k++) frames.push(await frame(page, k / 40))
-    const wrap = await frame(page, 1)
-    assert.ok(diff(wrap, frames[0]).max === 0, 'phase 1 must equal phase 0')
     const gap = (a, b) => {
       let sum = 0
       for (let i = 0; i < a.length; i += 4) sum += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])
@@ -138,6 +146,32 @@ describe('renderer invariants', () => {
     const closing = gap(frames[39], frames[0])
     assert.ok(closing <= median * 1.5, `closing step ${closing.toFixed(2)} against median ${median.toFixed(2)}`)
     assert.ok(median > 0.2, 'frames should differ from each other')
+  })
+
+  test('the decoded GIF closing step is comparable to neighboring steps', async (t) => {
+    await reset()
+    await addArrow({ x0: 0.1, y0: 0.4, x1: 0.8, y1: 0.55 })
+    const input = []
+    for (let n = 0; n < GIF.frames; n++) input.push(await frame(page, n / GIF.frames))
+    const reader = new GifReader(encodeGif(input, W, H))
+    const canvas = new Uint8Array(W * H * 4)
+    const frames = Array.from({ length: reader.numFrames() }, (_, n) => {
+      reader.decodeAndBlitFrameRGBA(n, canvas)
+      return canvas.slice()
+    })
+    const gap = (a, b) => {
+      let sum = 0
+      for (let i = 0; i < a.length; i += 4) {
+        for (let c = 0; c < 3; c++) sum += Math.abs(a[i + c] - b[i + c])
+      }
+      return sum / (W * H * 3)
+    }
+    const steps = frames.slice(0, -1).map((f, n) => gap(f, frames[n + 1])).sort((a, b) => a - b)
+    const median = steps[Math.floor(steps.length / 2)]
+    const closing = gap(frames.at(-1), frames[0])
+    assert.ok(median > 0.2, 'decoded frames should differ from each other')
+    assert.ok(closing <= median * 1.5, `decoded closing step ${closing} against median ${median}`)
+    t.diagnostic(`decoded GIF closing RGB step ${closing}, neighboring median ${median}`)
   })
 
   test('the preview canvas and the export renderer draw identical pixels', async () => {

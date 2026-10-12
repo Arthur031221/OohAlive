@@ -108,3 +108,49 @@ test('a region that never changes decodes to the same pixels in every frame', ()
   }
   out.forEach((frame, n) => assert.ok(still(frame, out[0]), `frame ${n} changed the still half`))
 })
+
+test('a one-pixel frozen border near palette bucket boundaries stays still in every decoded frame', (t) => {
+  const left = 20
+  const right = W - 21
+  const top = 12
+  const bottom = H - 13
+  const border = []
+  const moving = []
+  let seed = 19
+  const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) >>> 24
+  // Spread frozen colors across RGB565 cells, on either side of their edges.
+  const frozenColors = new Uint8ClampedArray(W * H * 3)
+  for (let i = 0; i < frozenColors.length; i++) {
+    const bucket = i % 3 === 1 ? 4 : 8
+    frozenColors[i] = Math.floor(random() / bucket) * bucket + (i % 2 ? bucket - 1 : 0)
+  }
+  const input = Array.from({ length: GIF.frames }, (_, n) => {
+    const rgba = new Uint8ClampedArray(W * H * 4)
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4
+        const frozen = ((x === left || x === right) && y >= top && y <= bottom) ||
+          ((y === top || y === bottom) && x >= left && x <= right)
+        if (n === 0 && frozen) border.push(i)
+        if (n === 0 && x > left && x < right && y > top && y < bottom) moving.push(i)
+        for (let c = 0; c < 3; c++) rgba[i + c] = frozen ? frozenColors[(y * W + x) * 3 + c] : random()
+        rgba[i + 3] = 255
+      }
+    }
+    return rgba
+  })
+  const { frames: out } = decode(encodeGif(input, W, H))
+  for (let n = 1; n < GIF.frames; n++) {
+    for (const i of border) {
+      for (let c = 0; c < 4; c++) {
+        assert.equal(input[n][i + c], input[0][i + c], 'fixture changed its frozen input')
+        assert.equal(out[n][i + c], out[0][i + c], `frame ${n} changed frozen border pixel ${i / 4}, channel ${c}`)
+      }
+    }
+    assert.ok(moving.some((i) => out[n][i] !== out[n - 1][i] || out[n][i + 1] !== out[n - 1][i + 1] || out[n][i + 2] !== out[n - 1][i + 2]), `frame ${n} lost the moving-region control`)
+  }
+  // Unchanged-input control exercises the same palette and delta-frame path.
+  const still = decode(encodeGif(input.map(() => input[0]), W, H)).frames
+  assert.ok(still.every((f) => Buffer.compare(Buffer.from(f), Buffer.from(still[0])) === 0), 'unchanged input must decode unchanged')
+  t.diagnostic(`${border.length} frozen border pixels unchanged across ${GIF.frames} decoded frames, moving and unchanged-input controls passed`)
+})
